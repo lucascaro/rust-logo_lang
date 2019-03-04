@@ -1,0 +1,25 @@
+# Spiral
+F 1
+L
+F 1
+L
+F 2
+L
+F 3
+L
+F 5
+L
+F 8
+L
+F 13
+L
+F 21
+L
+F 34
+L
+F 55
+L
+F 89
+L
+F 144
+REPEAT 4 [ REPEAT 4 [ REPEAT 6 [ REPEAT 10 [ L F 1 R F 1 ] L F 10 ] L F 10 ] L F 10 ]

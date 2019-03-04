@@ -1,0 +1,8 @@
+
+# Radius
+PENUP
+F 50
+PENDOWN
+
+
+REPEAT 4 [ L F 10 L F 1 R F 7 L F 1 R F 6 L F 2 R F 4 L F 3 R F 3 L F 4 R F 2 L F 6 R F 1 L F 7 R F 1 L F 10 R ]
