@@ -43,11 +43,11 @@ impl Direction {
     }
 
     pub fn rotate(&self, d: &TurningDirection) -> Direction {
-        let delta = match d {
-            &TurningDirection::LEFT => 1,
-            &TurningDirection::RIGHT => -1,
+        let delta = match *d {
+            TurningDirection::LEFT => 1,
+            TurningDirection::RIGHT => -1,
         };
         trace!("Rotate {:?}: {:?}", self, self._next(delta));
-        return self._next(delta);
+        self._next(delta)
     }
 }

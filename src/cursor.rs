@@ -35,19 +35,20 @@ impl Cursor {
             x: self.pos.x + (distance as i32 * dir.x) as f32,
             y: self.pos.y + (distance as i32 * dir.y) as f32,
         };
-        return match self.writing {
-            true => Some(self.draw_line(&old_position, &self.pos)),
-            false => None,
-        };
+        if self.writing {
+            Some(self.draw_line(&old_position, &self.pos))
+        } else {
+            None
+        }
     }
 
     fn draw_line(&self, p1: &Point<f32>, p2: &Point<f32>) -> Fig {
         debug!("line from {:?} to {:?}", p1, p2);
-        return Fig::Line(p1.x, p1.y, p2.x, p2.y).styled(
+        Fig::Line(p1.x, p1.y, p2.x, p2.y).styled(
             Attr::default()
                 .stroke(self.stroke_color)
                 .stroke_width(self.stroke_width),
-        );
+        )
     }
 
     pub fn stop_writing(&mut self) {
@@ -66,22 +67,22 @@ impl Cursor {
     }
 
     pub fn apply_command(&mut self, cmd: &Command) -> Option<Fig> {
-        match cmd {
-            &Command::Forward(d) => return self.move_forwards(d),
-            &Command::Repeat(n, ref c) => return self.repeat(n, c),
-            &Command::SetSize(d) => self.set_size(d),
-            &Command::SetColor(r, g, b) => self.set_color(r, g, b),
-            &Command::Left => self.rotate(&TurningDirection::LEFT),
-            &Command::Right => self.rotate(&TurningDirection::RIGHT),
-            &Command::Up => self.stop_writing(),
-            &Command::Down => self.start_writing(),
-            &Command::EndRepeat => panic!("EndRepeat found in wrong context"),
+        match *cmd {
+            Command::Forward(d) => return self.move_forwards(d),
+            Command::Repeat(n, ref c) => return self.repeat(n, c),
+            Command::SetSize(d) => self.set_size(d),
+            Command::SetColor(r, g, b) => self.set_color(r, g, b),
+            Command::Left => self.rotate(&TurningDirection::LEFT),
+            Command::Right => self.rotate(&TurningDirection::RIGHT),
+            Command::Up => self.stop_writing(),
+            Command::Down => self.start_writing(),
+            Command::EndRepeat => panic!("EndRepeat found in wrong context"),
         };
         debug!("Cursor: {:?}", self);
-        return None;
+        None
     }
 
-    pub fn repeat(&mut self, n: u32, cs: &Vec<Command>) -> Option<Fig> {
+    pub fn repeat(&mut self, n: u32, cs: &[Command]) -> Option<Fig> {
         let mut figs = Vec::new();
         for iteration in 0..n {
             trace!("iteration {} of {:?}", iteration, cs);
@@ -92,9 +93,9 @@ impl Cursor {
             }
         }
 
-        return match figs.len() {
+        match figs.len() {
             0 => None,
             _ => Some(Fig::Multiple(figs)),
-        };
+        }
     }
 }

@@ -7,58 +7,24 @@ extern crate simplesvg;
 use std::fs::File;
 use std::io::prelude::*;
 
+mod cli;
 mod command;
 mod cursor;
 mod direction;
+mod logging;
 mod point;
 
 use command::Command;
 use cursor::Cursor;
 
-fn main() {
-    let matches = clap::App::new("Logo")
-        .version("1.0.0")
-        .author("Lucas Caro")
-        .about("Simple logo interpreter in Rust")
-        .arg(
-            clap::Arg::with_name("input")
-                .help("Input file")
-                .required(true)
-                .index(1),
-        )
-        .arg(
-            clap::Arg::with_name("verbose")
-                .short("v")
-                .long("verbose")
-                .multiple(true)
-                .help("Sets the level of verbosity"),
-        )
-        .get_matches();
-
-    let input = matches.value_of("input").unwrap();
-    let log_level = match matches.occurrences_of("verbose") {
-        0 => log::LevelFilter::Error,
-        1 => log::LevelFilter::Warn,
-        2 => log::LevelFilter::Info,
-        3 => log::LevelFilter::Debug,
-        _ => log::LevelFilter::Trace,
-    };
-    simplelog::TermLogger::init(log_level, simplelog::Config::default()).unwrap();
-
-    debug!("input: {}", input);
-    debug!("verbosity: {:?}", log_level);
-    if log_level >= log::LevelFilter::Debug {
-        debug!("We are very verbose!");
-    }
-
+fn get_code_from_file(input: &str) -> String {
     let mut f = File::open(input).expect("error opening file");
-
     let mut code = String::new();
     f.read_to_string(&mut code).expect("error reading file");
+    code
+}
 
-    debug!("Code: \n{}", code);
-
-    info!("Running program...");
+fn create_drawing(code: &str) -> simplesvg::Svg {
     let mut drawing = Vec::new();
     let w = 640.;
     let h = 640.;
@@ -81,8 +47,7 @@ fn main() {
         }
     }
     let draw_fig = simplesvg::Fig::Multiple(drawing);
-    let svg_data = simplesvg::Svg(vec![draw_fig], w as u32, h as u32);
-    println!("{}", svg_data);
+    simplesvg::Svg(vec![draw_fig], w as u32, h as u32)
 }
 
 fn parse_line(i: usize, line: &str) -> Option<Command> {
@@ -95,8 +60,22 @@ fn parse_line(i: usize, line: &str) -> Option<Command> {
         ($($arg:tt)*) => (panic!("{} \nOn line {}: `{}`\n", format_args!($($arg)*),i,line));
     }
 
-    match Command::from_line(line) {
-        Ok(c) => return Some(c),
-        Err(e) => lpanic!("error parsing command: {}", e),
-    };
+    Command::from_line(line)
+        .map_err(|e| lpanic!("error parsing command: {}", e))
+        .ok()
+}
+
+fn main() {
+    let matches = cli::args();
+
+    let input = matches.value_of("input").unwrap();
+    logging::init(matches.occurrences_of("verbose"));
+
+    debug!("input: {}", input);
+    let code = get_code_from_file(input);
+    debug!("Code: \n{}", code);
+
+    info!("Running program...");
+    let svg_data = create_drawing(&code);
+    println!("{}", svg_data);
 }

@@ -1,7 +1,8 @@
 use std::i64;
 use std::str;
 
-pub static VALID_COMMANDS: &str = "FORWARD, F, LEFT, L, RIGHT , R, PENUP, U, PENDOW, D";
+pub static VALID_COMMANDS: &str =
+    "FORWARD, F, LEFT, L, RIGHT , R, PENUP, U, PENDOW, D, REPEAT, R, SETCOLOR, C";
 
 #[derive(Debug)]
 pub enum Command {
@@ -18,10 +19,14 @@ pub enum Command {
 
 impl Command {
     pub fn from_line(line: &str) -> Result<Command, String> {
-        return Command::from_chunks(&mut line.split_whitespace());
+        Command::from_chunks(&mut line.split_whitespace())
     }
 
     pub fn from_chunks(chunks: &mut str::SplitWhitespace) -> Result<Command, String> {
+        trace!(
+            "Command from chunks: {:?}",
+            chunks.clone().collect::<Vec<&str>>()
+        );
         match chunks.next() {
             Some("PENUP") | Some("U") => Ok(Command::Up),
             Some("PENDOWN") | Some("D") => Ok(Command::Down),
@@ -75,23 +80,26 @@ impl Command {
         if &s[..2] != "0x" {
             panic!("single argument colors must start with `0x`, got `{}`", s);
         }
-        let mut long = String::from(s);
-        if s.len() < 8 {
-            let chars: Vec<_> = match s.len() {
-                5 => (&s[2..]).split("").collect(),
-                _ => panic!(
-                    "hex color must have 3 or 5 digits after 0x, , found `{}`.",
-                    s
-                ),
-            };
+        if s.len() == 8 {
+            String::from(s)
+        } else if s.len() == 3 {
+            format!("0x{}", (&s[2..]).repeat(8))
+        } else if s.len() != 5 {
+            panic!(
+                "hex color must have 1, 3 or 6 digits after 0x, , found {}: `{}`.",
+                s.len(),
+                s
+            )
+        } else {
+            let chars: Vec<_> = (&s[2..]).split("").collect();
             trace!("chars for hex: `{:?}`", chars);
-            long = format!(
-                "0x{}{}{}{}{}{}",
-                chars[1], chars[1], chars[2], chars[2], chars[3], chars[3]
+            let long = format!(
+                "0x{}",
+                chars.iter().map(|c| c.repeat(2)).collect::<String>()
             );
             trace!("normalized color from hex: `{}`", long);
+            long
         }
-        return long;
     }
 
     fn colors_from_hex(s: &str) -> [u8; 3] {
@@ -107,30 +115,40 @@ impl Command {
         panic!("error converting hex to color: {}", s);
     }
 
+    fn next_int_chunk(chunks: &mut str::SplitWhitespace) -> Result<u8, String> {
+        chunks
+            .next()
+            .ok_or_else(|| String::from("missing color segment"))
+            .and_then(|c| c.parse::<u8>().map_err(|e| format!("parsing color {}", e)))
+    }
+
     pub fn setcolor_from_chunks(chunks: &mut str::SplitWhitespace) -> Result<Command, String> {
-        let mut colors: [u8; 3] = [0, 0, 0];
-        if chunks.clone().count() == 1 {
-            colors = Command::colors_from_hex(chunks.next().unwrap());
+        let first_color_str = chunks
+            .next()
+            .ok_or_else(|| String::from("error parsing color: no color to parse"))?;
+        if let Ok(first_color) = first_color_str.parse::<u8>() {
+            let segments = vec![
+                Ok(first_color),
+                Command::next_int_chunk(chunks),
+                Command::next_int_chunk(chunks),
+            ]
+            .into_iter()
+            .collect::<Result<Vec<u8>, String>>();
+            segments.map(|s| [s[0], s[1], s[2]])
         } else {
-            for i in 0..3 {
-                match chunks.next() {
-                    Some(text) => match text.parse() {
-                        Ok(n) => colors[i] = n,
-                        Err(e) => return Err(format!("error parsing color component: {}", e)),
-                    },
-                    None => return Err(format!("Setcolor requires three numeric parameters.",)),
-                }
-            }
+            Ok(Command::colors_from_hex(&first_color_str))
         }
-        return Ok(Command::SetColor(colors[0], colors[1], colors[2]));
+        .map(|colors| Command::SetColor(colors[0], colors[1], colors[2]))
+        .map_err(|e| format!("error parsing color components: {}", e))
     }
 
     pub fn repeat_from_split(chunks: &mut str::SplitWhitespace) -> Result<Command, String> {
         // chunks.collect::<Vec<&str>>().join(" ");
         let n = match chunks.next() {
-            Some(text) => text.parse()
+            Some(text) => text
+                .parse()
                 .ok()
-                .ok_or(format!("REPEAT: expected number, found `{}`", text))?,
+                .ok_or_else(|| format!("REPEAT: expected number, found `{}`", text))?,
             None => return Err(String::from("REPEAT: expected number, found nothing.")),
         };
         match chunks.next() {
@@ -148,6 +166,6 @@ impl Command {
                 Err(e) => return Err(e),
             };
         }
-        return Ok(Command::Repeat(n, commands));
+        Ok(Command::Repeat(n, commands))
     }
 }
